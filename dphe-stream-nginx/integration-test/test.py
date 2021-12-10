@@ -16,9 +16,26 @@ config = configparser.ConfigParser()
 config.read(Path(__file__).absolute().parent / 'test.cfg')
 
 user_token = config['TEST']['AUTH_TOKEN']
+
 # Remove trailing slash / from URL base to avoid "//" caused by config with trailing slash
-base_url = config['TEST']['BASE_URL'].strip('/')
-report = config['TEST']['REPORT']
+base_url = config['TEST']['REST_API_BASE_URL'].strip('/')
+
+report_tuples = config.items('REPORTS')
+
+logger.debug(config.items('REPORTS'))
+
+
+####################################################################################################
+## Non-test Functions
+####################################################################################################
+
+def parse_patient_and_report(report_rel_path):
+    val_list = report_rel_path.split("/")
+    patient_name = val_list[1]
+    report_name = val_list[2]
+
+    return patient_name, report_name
+
 
 """
 Create a dict of HTTP Authorization header with Bearer token
@@ -44,102 +61,128 @@ def create_request_headers(user_token):
     return headers_dict
 
 
+####################################################################################################
+## Test Cases
+####################################################################################################
+
 class TestRestApi(unittest.TestCase):
 
     def test_summarize_doc(self):
         with self.assertRaises(Exception) as context:
             broken_function()
 
-        target_url = f'{base_url}/summarizeDoc/doc/doc1'
-        request_headers = create_request_headers(user_token)
-        # Add content-type header
-        request_headers['content-type'] = 'text/plain'
+        for (key, report_rel_path) in report_tuples:
+            patient_name, report_name = parse_patient_and_report(report_rel_path)
 
-        report_text = (Path(__file__).absolute().parent / report).read_text()
+            target_url = f'{base_url}/summarizeDoc/doc/{report_name}'
+            request_headers = create_request_headers(user_token)
+            # Add content-type header
+            request_headers['content-type'] = 'text/plain'
 
-        logger.debug(report_text)
+            report_text = (Path(__file__).absolute().parent / report_rel_path).read_text()
 
-        # HTTP GET
-        response = requests.get(url = target_url, headers = request_headers, data = report_text)
+            #logger.debug(report_text)
 
-        result_dict = response.json()
-        
-        logger.debug(result_dict)
+            # HTTP GET
+            # The requests package attempts to auto-encode the data for transfer and fallback is latin-1
+            # Specify to encode with utf-8 to avoid encoding error
+            response = requests.get(url = target_url, headers = request_headers, data = report_text.encode('utf-8'))
 
-        expr = ('id' in result_dict) and (result_dict['id'] == 'doc1')
+            result_dict = response.json()
+            
+            #logger.debug(result_dict)
 
-        self.assertTrue(expr, "doc1 summarized")
+            expr = ('id' in result_dict) and (result_dict['id'] == report_name)
+
+            self.assertTrue(expr, f"Message: {report_name} summarized")
 
 
     def test_summarize_patient_doc(self):
         with self.assertRaises(Exception) as context:
             broken_function()
 
-        target_url = f'{base_url}/summarizePatientDoc/patient/patientX/doc/doc1'
-        request_headers = create_request_headers(user_token)
-        # Add content-type header
-        request_headers['content-type'] = 'text/plain'
+        for (key, report_rel_path) in report_tuples:
+            patient_name, report_name = parse_patient_and_report(report_rel_path)
 
-        report_text = (Path(__file__).absolute().parent / report).read_text()
+            target_url = f'{base_url}/summarizePatientDoc/patient/{patient_name}/doc/{report_name}'
+            request_headers = create_request_headers(user_token)
+            # Add content-type header
+            request_headers['content-type'] = 'text/plain'
 
-        logger.debug(report_text)
+            report_text = (Path(__file__).absolute().parent / report_rel_path).read_text()
 
-        # HTTP PUT
-        response = requests.put(url = target_url, headers = request_headers, data = report_text)
+            #logger.debug(report_text)
 
-        result_dict = response.json()
-        
-        logger.debug(result_dict)
+            # HTTP PUT
+            # The requests package attempts to auto-encode the data for transfer and fallback is latin-1
+            # Specify to encode with utf-8 to avoid encoding error
+            response = requests.put(url = target_url, headers = request_headers, data = report_text.encode('utf-8'))
 
-        expr = ('id' in result_dict) and (result_dict['id'] == 'patientX')
+            result_dict = response.json()
+            
+            #logger.debug(result_dict)
 
-        self.assertTrue(expr, "patientX doc1 summarized")
+            expr = ('id' in result_dict) and (result_dict['id'] == patient_name)
+
+            self.assertTrue(expr, "Message: {patient_name} {report_name} summarized")
     
 
     def test_queue_patient_doc(self):
         with self.assertRaises(Exception) as context:
             broken_function()
 
-        target_url = f'{base_url}/queuePatientDoc/patient/patientX/doc/doc1'
-        request_headers = create_request_headers(user_token)
-        # Add content-type header
-        request_headers['content-type'] = 'text/plain'
+        for (key, report_rel_path) in report_tuples:
+            patient_name, report_name = parse_patient_and_report(report_rel_path)
 
-        report_text = (Path(__file__).absolute().parent / report).read_text()
+            target_url = f'{base_url}/queuePatientDoc/patient/{patient_name}/doc/{report_name}'
+            request_headers = create_request_headers(user_token)
+            # Add content-type header
+            request_headers['content-type'] = 'text/plain'
 
-        logger.debug(report_text)
+            report_text = (Path(__file__).absolute().parent / report_rel_path).read_text()
 
-        # HTTP PUT
-        response = requests.put(url = target_url, headers = request_headers, data = report_text)
+            #logger.debug(report_text)
 
-        result_dict = response.json()
-        
-        logger.debug(result_dict)
+            # HTTP PUT
+            # The requests package attempts to auto-encode the data for transfer and fallback is latin-1
+            # Specify to encode with utf-8 to avoid encoding error
+            response = requests.put(url = target_url, headers = request_headers, data = report_text.encode('utf-8'))
 
-        # {'name': 'Document Queued', 'value': 'Added patinetX doc1 to the Text Processing Queue.'}
-        expr = ('name' in result_dict) and (result_dict['name'] == 'Document Queued')
+            result_dict = response.json()
+            
+            #logger.debug(result_dict)
 
-        self.assertTrue(expr, "patientX doc1 queued up")
+            # {'name': 'Document Queued', 'value': 'Added patientX patientX_doc1_RAD.txt to the Text Processing Queue.'}
+            expr = ('name' in result_dict) and (result_dict['value'] == f'Added {patient_name} {report_name} to the Text Processing Queue.')
+
+            self.assertTrue(expr, "Message: {patient_name} {report_name} queued up")
 
 
     def test_summarize_patient(self):
         with self.assertRaises(Exception) as context:
             broken_function()
 
-        target_url = f'{base_url}/summarizePatient/patient/patientX'
-        request_headers = create_request_headers(user_token)
+        for (key, report_rel_path) in report_tuples:
+            patient_name, report_name = parse_patient_and_report(report_rel_path)
 
-        # HTTP GET
-        response = requests.get(url = target_url, headers = request_headers)
+            target_url = f'{base_url}/summarizePatient/patient/{patient_name}'
+            request_headers = create_request_headers(user_token)
 
-        result_dict = response.json()
-        
-        logger.debug(result_dict)
+            # HTTP GET
+            response = requests.get(url = target_url, headers = request_headers)
 
-        expr = ('id' in result_dict) and (result_dict['id'] == 'patientX')
+            result_dict = response.json()
+            
+            #logger.debug(result_dict)
 
-        self.assertTrue(expr, "patientX summarized")
+            expr = ('id' in result_dict) and (result_dict['id'] == patient_name)
 
+            self.assertTrue(expr, "Message: {patient_name} summarized")
+
+
+####################################################################################################
+## Run test.py as script
+####################################################################################################
 
 if __name__ == '__main__':
     unittest.main()
