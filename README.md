@@ -1,14 +1,9 @@
 # DeepPhe Stream Multi-Container Stack - release branch
 
-This multi-container docker stack consists of the following 2 contaienrs: 
+This multi-container docker stack consists of the following 2 containers: 
 
 - 1 : `dphe-stream-nginx` (reverse proxy)
 - 2 : `dphe-stream` (document and patient summary REST API)
-
-## Changes needed to make a release
-
-- 1: Place the source code zip file, for instance `v0.2.0-cr-release.zip`, to the directory `dphe-stream`. And this zip file will be used to build the `dphe-stream` docker image. 
-- 2: Edit the `dphe-stream/Dockerfile` and specify to use the target release version, for instance `0.2.0`. 
 
 ## Overview of tools
 
@@ -17,7 +12,7 @@ This multi-container docker stack consists of the following 2 contaienrs:
 
 Note: Docker Compose requires Docker to be installed and running first.
 
-### Docker post-installation configurations
+### Docker post-installation configurations   (optional)
 
 The Docker daemon binds to a Unix socket instead of a TCP port. By default that Unix socket is owned by the user root and other users can only access it using sudo. The Docker daemon always runs as the root user. 
 
@@ -27,15 +22,15 @@ If you're using Linux and you don't want to preface the docker command with sudo
 sudo usermod -aG docker $USER
 ````
 
-The log out and log back in so that your group membership is re-evaluated. If testing on a virtual machine, it may be necessary to restart the virtual machine for changes to take effect.
+Then log out and log back in so that your group membership is re-evaluated. If testing on a virtual machine, it may be necessary to restart the virtual machine for changes to take effect.
 
 Note: the following instructions with docker commands are based on managing Docker as a non-root user.
 
 ## Build docker images
 
-### Specify auth token
+### Specify auth token   (optional)
 
-Before starting building the child images, specify the auth token in `dphe-stream/deepphe.properties`. This auth token will be used later when interacting with the REST API calls via the standard HTTP request `Authorization` header with the Bearer scheme:
+Before building the child images, specify the auth token in `dphe-stream/deepphe.properties`. This auth token will be used later when interacting with the REST API calls via the standard HTTP request `Authorization` header with the Bearer scheme:
 
 ````
 Authorization: Bearer <token>
@@ -53,7 +48,7 @@ Next go back to the project root directory where you can find the `docker-compos
 docker-compose build --no-cache
 ````
 
-### Vulnerability scanning for local images
+### Vulnerability scanning for local images   (optional)
 
 Vulnerability scanning for Docker local images allows us to review the security state of the container images and take actions to fix issues identified during the scan, resulting in more secure deployments. The `scan` command is available by default in Docker version 20.10.x and newer.
 
@@ -81,9 +76,11 @@ In security practice, the processes within a running container should not run as
 docker-compose up -d
 ````
 
-This command spins up all the services (in the background as detached mode and leaves them running) defiened in the `docker-compose.yml` and aggregates the output of each container. Make sure the port `8080` and `8181` are not already allocated, otherwise the containers would fail to start.
+This command spins up all the services (in the background as detached mode and leaves them running) defiened in the `docker-compose.yml` and aggregates the output of each container. 
 
-Note: the initialization of containers takes some time, you can use the following command in another terminal window to monitor the progress:
+Note: Make sure the port `8080` and `8181` are not already allocated, otherwise the containers would fail to start.
+
+Note: Container initialization takes some time, you can use the following command in another terminal window to monitor the progress:
 
 ````
 docker-compose logs -f --tail="all" 
@@ -96,7 +93,7 @@ You will have the following API base URL for the REST API container:
 
 - `dphe-stream`: `http://localhost:8080/deepphe`
 
-Please remember that you'll need to send over the auth token (specified prior the docker build) in the `Authorization` header for each HTTP request:
+Note: You will need to send over the auth token, specified in `dphe-stream/deepphe.properties`, in the `Authorization` header for each HTTP request:
 
 ````
 Authorization: Bearer <token>
@@ -174,7 +171,7 @@ curl -i -X GET http://localhost:8080/deepphe/summarizePatient/patient/patientX \
 
 ## Manage the contaners
 
-### Shell into the running container
+### Shell into the running container   (optional)
 
 Sometimes you may want to shell into a running container to check more details, this can be done by:
 
@@ -206,7 +203,7 @@ This command stops both containers of this project and removes them as well the 
 Note: At this time DeepPhe Stream could be run with a single container.  The multi-container stack exists to facilitate addition future workflows that may require additional containers.   
 
 
-## Integration tests
+## Integration tests   (optional)
 
 Once the containers are up running, we can execute some integration tests written in Python to verify the pipeline output by submitting some sample reports to the REST API. The tests will be executed against the `dphe-stream-nginx` container, which proxies the requests to the backend REST API service.
 
