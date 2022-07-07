@@ -5,6 +5,12 @@ This multi-container docker stack consists of the following 2 containers:
 - 1 : `dphe-stream-nginx` (reverse proxy)
 - 2 : `dphe-stream` (document and patient summary REST API)
 
+## Overview of componments and architecture
+
+- When the client makes an API call via HTTP request to the `dphe-stream-nginx` container, the request gets proxied to the upstream container `dphe-stream` which fullfills the actual handling.
+- As a requirement, we don not persist information anywhere except temporarily within the jvm. We only use an embedded instance of neo4j for the system to read the ontology.
+- The `dphe-stream` container is just a thin wrapper that exposes the REST API endpoints, and it is the backend pipeline that does the heavy lifting of NLP and returns the extracted information. 
+
 ## Overview of tools
 
 - [Docker Engine](https://docs.docker.com/install/)
