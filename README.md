@@ -2,7 +2,7 @@
 
 ## Overview of components and architecture
 
-This multi-container docker stack consists of the following 2 contaienrs as shown in the diagram: 
+This multi-container docker stack consists of the following 2 containers as shown in the diagram: 
 
 - 1 : `dphe-stream-nginx`
 - 2 : `dphe-stream`
