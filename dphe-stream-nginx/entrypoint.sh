@@ -1,10 +1,22 @@
 #!/bin/bash
 
-# Pass the HOST_UID and HOST_UID from environment variables specified in the child image docker-compose
+# Pass the environment variables specified in docker-compose
 HOST_GID=${HOST_GID}
 HOST_UID=${HOST_UID}
+UPSTREAM_ENDPOINT=${UPSTREAM_ENDPOINT}
 
-echo "Starting dphe-stream-nginx container with the same host user UID: $HOST_UID and GID: $HOST_GID"
+# Nginx reverse proxy forwarding requires the upstream service to be running and ready to accept requests
+# Otherweise we'll get 502 error
+# Using --head will avoid downloading the response content, since we don't need it for this check
+# Using --silent will avoid status or errors from being emitted by the check itself
+until curl --output /dev/null --silent --head "$UPSTREAM_ENDPOINT"; do
+    echo "The upstream 'dphe-stream' service is initializing and not ready yet - sleeping 5 seconds..."
+    sleep 5
+done
+  
+echo "The upstream 'dphe-stream' service is ready :-)"
+
+echo "Started dphe-stream-nginx container with the mapped host user UID: $HOST_UID and GID: $HOST_GID"
 
 # Create a new user with the same host UID to run processes on container
 # The Filesystem doesn't really care what the user is called,

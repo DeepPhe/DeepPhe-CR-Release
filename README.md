@@ -1,15 +1,17 @@
-# DeepPhe Stream Multi-Container Stack - release branch
-
-This multi-container docker stack consists of the following 2 containers: 
-
-- 1 : `dphe-stream-nginx` (reverse proxy)
-- 2 : `dphe-stream` (document and patient summary REST API)
+# DeepPhe Stream Multi-Container Stack
 
 ## Overview of components and architecture
 
-- When the client makes an API call via HTTP request to the `dphe-stream-nginx` container, the request gets proxied to the upstream container `dphe-stream` which fullfills the actual handling.
-- As a requirement, we don not persist information anywhere except temporarily within the jvm. We only use an embedded instance of neo4j for the system to read the ontology.
-- The `dphe-stream` container is just a thin wrapper that exposes the REST API endpoints, and it is the backend pipeline that does the heavy lifting of NLP and returns the extracted information. 
+This multi-container docker stack consists of the following 2 contaienrs as shown in the diagram: 
+
+- 1 : `dphe-stream-nginx`
+- 2 : `dphe-stream`
+
+![Components and architecture diagram](/dphe-stream-dock.png)
+
+- When the client makes an API call via HTTP request to the `dphe-stream-nginx` container, the request gets proxied via Nginx to the REST API server running within the upstream container `dphe-stream`, which fullfills the actual handling by calling the NLP pipeline.
+- As a requirement, we do not persist information anywhere except temporarily within the jvm of the  `dphe-stream` container. We only use an embedded instance of neo4j for the system to read the static ontology graph.
+- The REST API in the `dphe-stream` container is just a thin wrapper that exposes the endpoints to accept requests of document and patient summarizations, and it is the backend NLP pipeline that does the heavy lifting as well as returns the extracted information.
 
 ## Overview of tools
 
@@ -18,7 +20,7 @@ This multi-container docker stack consists of the following 2 containers:
 
 Note: Docker Compose requires Docker to be installed and running first.
 
-### Docker post-installation configurations   (optional)
+### Docker post-installation configurations: Linux only
 
 The Docker daemon binds to a Unix socket instead of a TCP port. By default that Unix socket is owned by the user root and other users can only access it using sudo. The Docker daemon always runs as the root user. 
 
@@ -28,15 +30,34 @@ If you're using Linux and you don't want to preface the docker command with sudo
 sudo usermod -aG docker $USER
 ````
 
-Then log out and log back in so that your group membership is re-evaluated. If testing on a virtual machine, it may be necessary to restart the virtual machine for changes to take effect.
+The log out and log back in so that your group membership is re-evaluated. If testing on a virtual machine, it may be necessary to restart the virtual machine for changes to take effect.
 
 Note: the following instructions with docker commands are based on managing Docker as a non-root user.
 
+These permissions do not appear to be a concern on OS X and Windows. 
+
 ## Build docker images
 
-### Specify auth token   (optional)
+### Dedicated private SSH key
 
-Before building the child images, specify the auth token in `dphe-stream/deepphe.properties`. This auth token will be used later when interacting with the REST API calls via the standard HTTP request `Authorization` header with the Bearer scheme:
+This is a deployment SSH key generated and used for pulling the private github repos during creating the `deepphe/dphe-stream-base` image. The image build will fail without this key. 
+
+### Build base image
+
+First you'll need to git clone this repository and build the `deepphe/dphe-stream-base` base image. You'll need the dedicated private key attached to the github machine user from the host machine (E.g., `PATH/deepphe-machine-user-ssh-private-key.txt`) and pass it as a build argument as below:
+
+````
+cd dphe-stream-base
+docker build --no-cache --build-arg SSH_PRIVATE_KEY="$(cat PATH/deepphe-machine-user-ssh-private-key.txt)" -t deepphe/dphe-stream-base:latest .
+````
+
+Note: replace the `PATH` with the actual directory path where this private SSH key can be found.
+
+We are using Docker's multi-stage build and the private SSH key is only used by the intermediate image and won't leave traces inside of the final base image.
+
+### Specify auth token
+
+Before starting building the child images, specify the auth token in `dphe-stream/deepphe.properties`. This auth token will be used later when interacting with the REST API calls via the standard HTTP request `Authorization` header with the Bearer scheme:
 
 ````
 Authorization: Bearer <token>
@@ -51,16 +72,24 @@ A default token is provided in the `dphe-stream/deepphe.propertiers` file. For g
 Next go back to the project root directory where you can find the `docker-compose.yml`:
 
 ````
+cd ..
 docker-compose build --no-cache
 ````
 
-### Vulnerability scanning for local images   (optional)
+### Vulnerability scanning for local images
 
 Vulnerability scanning for Docker local images allows us to review the security state of the container images and take actions to fix issues identified during the scan, resulting in more secure deployments. The `scan` command is available by default in Docker version 20.10.x and newer.
 
+Note that you might have to login via 
 ```
-docker scan --dependency-tree --file ./dphe-stream/Dockerfile dphe-stream:0.2.0-cr
-docker scan --dependency-tree --file ./dphe-stream-nginx/Dockerfile dphe-stream-nginx:0.2.0-cr
+docker scan --login
+```
+
+Once logged in, you can run the scans as follows:
+
+```
+docker scan --dependency-tree --file ./dphe-stream/Dockerfile dphe-stream:0.4.0
+docker scan --dependency-tree --file ./dphe-stream-nginx/Dockerfile dphe-stream-nginx:0.4.0
 ```
 
 ## Start up services
@@ -82,16 +111,27 @@ In security practice, the processes within a running container should not run as
 docker-compose up -d
 ````
 
-This command spins up all the services (in the background as detached mode and leaves them running) defiened in the `docker-compose.yml` and aggregates the output of each container. 
+This command spins up all the services (in the background as detached mode and leaves them running) defiened in the `docker-compose.yml` and aggregates the output of each container. Make sure the port `8080` and `8181` are not already allocated, otherwise the containers would fail to start.
 
-Note: Make sure the port `8080` and `8181` are not already allocated, otherwise the containers would fail to start.
-
-Note: Container initialization takes some time, you can use the following command in another terminal window to monitor the progress:
+Note: the initialization of containers takes some time, you can use the following command in another terminal window to monitor the progress:
 
 ````
 docker-compose logs -f --tail="all" 
 ````
 
+Once the containers are up, the `dphe-stream-nginx` checks agains the upstream `dphe-stream` service every 5 seconds to determine if the REST API is ready. You'll see the following logging message during the initialization:
+
+```
+dphe-stream-nginx    | The upstream 'dphe-stream' service is initializing and not ready yet - sleeping 5 seconds...
+```
+
+And once the upstream `dphe-stream` service is fully initialized and becomes available:
+
+```
+dphe-stream          | 2022-08-12 01:34:43.182  INFO 8 --- [           main] o.s.b.web.embedded.jetty.JettyWebServer  : Jetty started on port(s) 8080 (http/1.1) with context path '/'
+dphe-stream          | 2022-08-12 01:34:43.235  INFO 8 --- [           main] o.h.d.stream.rest.StreamRestApplication  : Started StreamRestApplication in 31.873 seconds (JVM running for 33.429)
+dphe-stream-nginx    | The upstream 'dphe-stream' service is ready :-)
+```
 
 ## Interact with the DeepPhe REST API
 
@@ -99,85 +139,69 @@ You will have the following API base URL for the REST API container:
 
 - `dphe-stream`: `http://localhost:8080/deepphe`
 
-Note: You will need to send over the auth token, specified in `dphe-stream/deepphe.properties`, in the `Authorization` header for each HTTP request:
+Please remember that you'll need to send over the auth token (specified prior the docker build) in the `Authorization` header for each HTTP request:
 
 ````
 Authorization: Bearer <token>
 ````
 
-If the auth token is missing from request or an invalid token being used, you'll get the HTTP 401 Unauthorized response.
+Note, if desired, replace the `<token>` with your custom token value, the default is `AbCdEf123456`. And if the auth token is missing from request or an invalid token being used, you'll get the HTTP 401 Unauthorized response.
 
 ### Submit a document, do not cache information
 
-Use the following URL pattern to process a document, and submit the document text in the request body. HTTP header `Content-Type: text/plain` is required to make the call. 
-
-````
-GET http://localhost:8080/deepphe/summarizeDoc/doc/<docId>
-````
-
-Example CURL command:
-
-````
-curl -i -X GET http://localhost:8080/deepphe/summarizeDoc/doc/doc1 \
-     -H "Content-Type: text/plain" \
-     -H "Authorization: Bearer AbCdEf123456" \
-     --data-binary "@patientX_doc1_RAD.txt"
-````
+| REST API          | Value                                                                  |
+|-------------------|------------------------------------------------------------------------|
+| HTTP method       | GET                                                                    |
+| Resource pattern  | `http://localhost:8080/deepphe/summarizeDoc/doc/<docId>`               |
+| HTTP Headers      | `Content-Type: text/plain` <br /> `Authorization: Bearer <token>`      |
+| HTTP request body | Text content of document                                               |
+| Response          | JSON object of resuting data                                           |
 
 ### Submit a document, cache information for patient summary
 
-Use the following URL pattern to process a document for a given patient, and submit the document text in the PUT body with HTTP header `Content-Type: text/plain`. The patient ID is not used in document processing but is required for future patient summarization.
+The patient ID is not used in document processing but is required for future patient summarization.
 
-````
-PUT http://localhost:8080/deepphe/summarizePatientDoc/patient/<patientId>/doc/<docId>
-````
+| REST API          | Value                                                                               |
+|-------------------|-------------------------------------------------------------------------------------|
+| HTTP method       | PUT                                                                                 |
+| Resource pattern  | `http://localhost:8080/deepphe/summarizePatientDoc/patient/<patientId>/doc/<docId>` |
+| HTTP Headers      | `Content-Type: text/plain` <br /> `Authorization: Bearer <token>`                   |
+| HTTP request body | Text content of document                                                            |
+| Response          | JSON object of simple message                                                       |
 
-Example CURL command:
+You can also queue up the process by using the following call:
 
-````
-curl -i -X PUT http://localhost:8080/deepphe/summarizePatientDoc/patient/patientX/doc/doc1 \
-     -H "Content-Type: text/plain" \
-     -H "Authorization: Bearer AbCdEf123456" \
-     --data-binary "@patientX_doc1_RAD.txt"
-````
+| REST API          | Value                                                                           |
+|-------------------|---------------------------------------------------------------------------------|
+| HTTP method       | PUT                                                                             |
+| Resource pattern  | `http://localhost:8080/deepphe/queuePatientDoc/patient/<patientId>/doc/<docId>` |
+| HTTP headers      | `Content-Type: text/plain` <br /> `Authorization: Bearer <token>`               |
+| HTTP request body | Text content of document                                                        |
+| Response          | JSON object of simple message                                                   |
 
-You can also queue up the process by using the following call with the document text in request body. HTTP header `Content-Type: text/plain` is required to make the call:
+For this call, you will just get back a simple JSON message since the text processing is queued up, for example:
 
-````
-PUT http://localhost:8080/deepphe/queuePatientDoc/patient/<patientId>/doc/<docId>
-````
-
-Example CURL command:
-
-````
-curl -i -X PUT http://localhost:8080/deepphe/queuePatientDoc/patient/patientX/doc/doc1 \
-     -H "Content-Type: text/plain" \
-     -H "Authorization: Bearer AbCdEf123456" \
-     --data-binary "@patientX_doc1_RAD.txt"
-````
-
-For this call, you won't get back the resulting JSON since the text processing is queued up.
+```
+{'name': 'Document Queued', 'value': 'Added patientX patientX_doc1_RAD.txt to the Text Processing Queue.'}
+```
 
 Note: The document information cache is automatically cleaned every 15 minutes, removing any document information that has not been accessed within the last 60 minutes.
 
 ### Summarize a patient
 
-A patient summary can only be created using document information that was cached.  This following call doesn't require a request body:
+A patient summary can only be created using document information that was cached. This call doesn't require a request body.
 
-````
-GET http://localhost:8080/deepphe/summarizePatient/patient/<patientId>
-````
-
-Example CURL command:
-
-````
-curl -i -X GET http://localhost:8080/deepphe/summarizePatient/patient/patientX \
-     -H "Authorization: Bearer AbCdEf123456"
-````
+| REST API          | Value                                                                  |
+|-------------------|------------------------------------------------------------------------|
+| HTTP method       | GET                                                                    |
+| Resource pattern  | `http://localhost:8080/deepphe/summarizePatient/patient/<patientId>`   |
+| HTTP headers      | `Authorization: Bearer <token>`                                        |
+| HTTP request body | Text content of document                                               |
+| Response          | JSON object of simple message                                          |
 
 ## Manage the contaners
 
-### Shell into the running container   (optional)
+### Shell into the running container
 
 Sometimes you may want to shell into a running container to check more details, this can be done by:
 
@@ -209,7 +233,7 @@ This command stops both containers of this project and removes them as well the 
 Note: At this time DeepPhe Stream could be run with a single container.  The multi-container stack exists to facilitate addition future workflows that may require additional containers.   
 
 
-## Integration tests   (optional)
+## Integration tests
 
 Once the containers are up running, we can execute some integration tests written in Python to verify the pipeline output by submitting some sample reports to the REST API. The tests will be executed against the `dphe-stream-nginx` container, which proxies the requests to the backend REST API service.
 
