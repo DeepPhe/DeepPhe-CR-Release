@@ -7,7 +7,7 @@
 
 ## Overview of components and architecture
 
-This multi-container docker stack consists of the following 2 contaienrs as shown in the diagram: 
+This multi-container docker stack consists of the following 2 containers as shown in the diagram: 
 
 - 1 : `dphe-stream-nginx`
 - 2 : `dphe-stream`
@@ -76,8 +76,8 @@ docker scan --login
 Once logged in, you can run the scans as follows:
 
 ```
-docker scan --dependency-tree --file ./dphe-stream/Dockerfile dphe-stream:0.2.0-cr
-docker scan --dependency-tree --file ./dphe-stream-nginx/Dockerfile dphe-stream-nginx:0.2.0-cr
+docker scan --dependency-tree --file ./dphe-stream/Dockerfile dphe-stream:0.3.0-cr
+docker scan --dependency-tree --file ./dphe-stream-nginx/Dockerfile dphe-stream-nginx:0.3.0-cr
 ```
 
 ## Start up services
