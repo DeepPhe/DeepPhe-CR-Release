@@ -34,7 +34,8 @@ ENV PATH $M2:$PATH
 RUN mvn -f /usr/src/app/v0.3.0-cr-release/dphe-onto-db/pom.xml clean install -DskipTests && \
     mvn -f /usr/src/app/v0.3.0-cr-release/dphe-neo4j/pom.xml clean install -DskipTests && \
     mvn -f /usr/src/app/v0.3.0-cr-release/dphe-core/pom.xml clean install -DskipTests && \
-    mvn -f /usr/src/app/v0.3.0-cr-release/dphe-stream/pom.xml clean install -DskipTests
+    mvn -f /usr/src/app/v0.3.0-cr-release/dphe-stream/pom.xml clean install -DskipTests && \
+    mvn -f /usr/src/app/v0.3.0-cr-release/dphe-stream-rest/pom.xml clean install -DskipTests
 
 # Change directory to build the REST API application jar
 WORKDIR /usr/src/app/v0.3.0-cr-release/dphe-stream-rest
@@ -70,4 +71,4 @@ EXPOSE 8080
 # Start the rest api server on port 8080 running as non-root
 # Note: since the current work dir is /usr/src/app/v0.3.0-cr-release/dphe-stream-rest, the logs will be generated here too
 # Thus we use /usr/src/app/v0.3.0-cr-release/dphe-stream-rest/logs for the volume mount in docker-compose.yml
-CMD ["java", "-jar","-Xmx6G","/usr/src/app/v0.3.0-cr-release/dphe-stream-rest/target/deepphe-stream-rest-0.3.0-cr.jar"]
+CMD ["java", "-jar","-Xmx6G","/usr/src/app/v0.3.0-cr-release/dphe-stream-rest/target/deepphe-stream-rest-0.5.0.jar"]
