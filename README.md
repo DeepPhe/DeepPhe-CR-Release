@@ -2,8 +2,8 @@
 
 ## Changes needed to make a release
 
-- 1: Place the source code zip file, for instance `v0.3.0-cr-release.zip`, to the directory `dphe-stream`. And this zip file will be used to build the `dphe-stream` docker image. 
-- 2: Edit the `dphe-stream/Dockerfile` and specify to use the target release version, for instance `0.3.0`. 
+- 1: Place the source code zip file, for instance `v0.4.0-cr-release.zip`, to the directory `dphe-stream`. And this zip file will be used to build the `dphe-stream` docker image. 
+- 2: Edit the `dphe-stream/Dockerfile` and specify to use the target release version, for instance `0.4.0`. 
 
 ## Overview of components and architecture
 
@@ -76,8 +76,8 @@ docker scan --login
 Once logged in, you can run the scans as follows:
 
 ```
-docker scan --dependency-tree --file ./dphe-stream/Dockerfile dphe-stream:0.3.0-cr
-docker scan --dependency-tree --file ./dphe-stream-nginx/Dockerfile dphe-stream-nginx:0.3.0-cr
+docker scan --dependency-tree --file ./dphe-stream/Dockerfile dphe-stream:0.4.0-cr
+docker scan --dependency-tree --file ./dphe-stream-nginx/Dockerfile dphe-stream-nginx:0.4.0-cr
 ```
 
 ## Start up services
